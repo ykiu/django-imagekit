@@ -27,6 +27,9 @@ class Photo(models.Model):
             sharpness=1.1), SmartCrop(50, 50)], source='original_image',
             format='JPEG', options={'quality': 90})
 
+    thumbnail_of_thumbnail = ImageSpecField([ResizeToFill(10, 10)], source='thumbnail',
+            format='JPEG', options={'quality': 90})
+
 
 class ProcessedImageFieldModel(models.Model):
     processed = ProcessedImageField([SmartCrop(50, 50)], format='JPEG',

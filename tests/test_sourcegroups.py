@@ -2,18 +2,19 @@ import pytest
 from django.core.files import File
 
 from imagekit.signals import source_saved
-from imagekit.specs.sourcegroups import ImageFieldSourceGroup
 
-from .models import AbstractImageModel, ConcreteImageModel, ImageModel
+from .models import AbstractImageModel, ConcreteImageModel, ImageModel, Photo
 from .utils import get_image_file
 
 
-def make_counting_receiver(source_group):
-    def receiver(sender, *args, **kwargs):
-        if sender is source_group:
-            receiver.count += 1
-    receiver.count = 0
-    return receiver
+def make_logging_receiver():
+    logs = []
+
+    def receiver(sender, signal, source):
+        # image_field is the name of the source field.
+        logs.append((sender.image_field, sender.model_class))
+
+    return receiver, logs
 
 
 @pytest.mark.django_db(transaction=True)
@@ -23,12 +24,12 @@ def test_source_saved_signal():
     dispatched.
 
     """
-    source_group = ImageFieldSourceGroup(ImageModel, 'image')
-    receiver = make_counting_receiver(source_group)
+    receiver, logs = make_logging_receiver()
     source_saved.connect(receiver)
     with File(get_image_file(), name='reference.png') as image:
-        ImageModel.objects.create(image=image)
-    assert receiver.count == 1
+        Photo.objects.create(original_image=image)
+    assert logs == [('original_image', Photo), ('original_image', Photo),
+                    ('thumbnail', Photo)]
 
 
 @pytest.mark.django_db(transaction=True)
@@ -40,11 +41,10 @@ def test_no_source_saved_signal():
     https://github.com/matthewwithanm/django-imagekit/issues/214
 
     """
-    source_group = ImageFieldSourceGroup(ImageModel, 'image')
-    receiver = make_counting_receiver(source_group)
+    receiver, logs = make_logging_receiver()
     source_saved.connect(receiver)
     ImageModel.objects.create()
-    assert receiver.count == 0
+    assert logs == []
 
 
 @pytest.mark.django_db(transaction=True)
@@ -54,9 +54,8 @@ def test_abstract_model_signals():
     dispatched on their concrete subclasses.
 
     """
-    source_group = ImageFieldSourceGroup(AbstractImageModel, 'original_image')
-    receiver = make_counting_receiver(source_group)
+    receiver, logs = make_logging_receiver()
     source_saved.connect(receiver)
     with File(get_image_file(), name='reference.png') as image:
         ConcreteImageModel.objects.create(original_image=image)
-    assert receiver.count == 1
+    assert logs == [('original_image', AbstractImageModel)]

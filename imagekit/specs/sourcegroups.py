@@ -84,10 +84,11 @@ class ModelSignalRouter:
         Returns a list of the source fields for the given instance.
 
         """
-        return {
+        # Filter out duplicates while preserving the order.
+        return list(dict.fromkeys(
             src.image_field
             for src in self._source_groups
-            if isinstance(instance, src.model_class)}
+            if isinstance(instance, src.model_class)))
 
     @ik_model_receiver
     def post_save_receiver(self, sender, instance=None, created=False, update_fields=None, raw=False, **kwargs):
